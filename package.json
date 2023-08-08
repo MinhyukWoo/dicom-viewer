@@ -9,6 +9,10 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@cornerstonejs/core": "^1.10.0",
+    "@cornerstonejs/dicom-image-loader": "^1.10.0",
+    "@cornerstonejs/streaming-image-volume-loader": "^1.10.0",
+    "@cornerstonejs/tools": "^1.10.0",
     "@types/node": "20.4.8",
     "@types/react": "18.2.18",
     "@types/react-dom": "18.2.7",
