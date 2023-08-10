@@ -160,7 +160,9 @@ export default function Viewer() {
       const { getRenderingEngine } = await import("@cornerstonejs/core");
       const renderingEngine = getRenderingEngine(renderingEngineId);
       const viewport = renderingEngine?.getViewport(VIEWPORT_ID);
-      await viewport?.setStack(imageIds, 0);
+      if (viewport && "setStack" in viewport) {
+        await viewport?.setStack(imageIds, 0);
+      }
       viewport?.render();
 
       const { metaData } = await import("@cornerstonejs/core");
@@ -275,7 +277,9 @@ export default function Viewer() {
                       getRenderingEngine(renderingEngineId);
                     const viewport = renderingEngine?.getViewport(VIEWPORT_ID);
                     viewport?.resetCamera();
-                    viewport?.resetProperties();
+                    if (viewport && "resetProperties" in viewport) {
+                      viewport?.resetProperties();
+                    }
                     viewport?.render();
                   }
                   resetView();
