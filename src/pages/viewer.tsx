@@ -1,22 +1,82 @@
+import { Grid, Paper } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
+import { ThemeProvider, createTheme } from "@mui/material/styles";
+import CssBaseline from "@mui/material/CssBaseline";
+import Snackbar from "@mui/material/Snackbar";
+import Alert from "@mui/material/Alert";
+import { DataGrid, GridColDef } from "@mui/x-data-grid";
+import MenuList from "@mui/material/MenuList";
+import MenuItem from "@mui/material/MenuItem";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import ContrastIcon from "@mui/icons-material/Contrast";
+import ReplayIcon from "@mui/icons-material/Replay";
+import StraightenIcon from "@mui/icons-material/Straighten";
+import OpenWithIcon from "@mui/icons-material/OpenWith";
+import { ZoomIn } from "@mui/icons-material";
+
+const darkTheme = createTheme({
+  palette: {
+    mode: "dark",
+  },
+});
+
+const dicomInfoColumns: GridColDef[] = [
+  { field: "key", headerName: "KEY", flex: 1 },
+  { field: "value", headerName: "VALUE", flex: 1 },
+];
 
 export default function Viewer() {
-  const RENDERING_ENGINE_ID = "myRenderingEngine";
   const VIEWPORT_ID = "CT_AXIAL_STACK";
   const TOOL_GROUP_ID = "myToolGroup";
   const viewer = useRef<HTMLDivElement>(null);
-  const [infos, setInfos] = useState<Array<Array<string>>>([]);
+  const [infos, setInfos] = useState<Array<Object>>([]);
+  const [imageIds, setImageIds] = useState<Array<string>>([]);
+  const [isSnackOpen, setIsSnackOpen] = useState(false);
+  const [renderingEngineId, setRenderingEngineId] =
+    useState("myRenderingEngine");
+  const [currentToolName, setCurrentToolName] = useState<string>();
+
+  function loadImageIds(files: FileList) {
+    async function render() {
+      const cornerstoneDICOMImageLoader = await import(
+        "@cornerstonejs/dicom-image-loader"
+      );
+      const imageId = cornerstoneDICOMImageLoader.wadouri.fileManager.add(
+        files[0]
+      );
+      setImageIds(() => [imageId]);
+    }
+    if (files) {
+      render();
+    }
+  }
+
+  async function changeToolActive(newToolName: string) {
+    const cornerstoneTools = await import("@cornerstonejs/tools");
+    const { ToolGroupManager, Enums: csToolsEnums } = cornerstoneTools;
+    if (currentToolName !== newToolName) {
+      const toolGroup = ToolGroupManager.getToolGroup(TOOL_GROUP_ID);
+      toolGroup?.setToolActive(newToolName, {
+        bindings: [
+          {
+            mouseButton: csToolsEnums.MouseBindings.Primary,
+          },
+        ],
+      });
+      if (currentToolName) {
+        toolGroup?.setToolPassive(currentToolName);
+      }
+      setCurrentToolName(newToolName);
+    }
+  }
 
   useEffect(() => {
-    async function initRenderStack(imageId: string) {
+    async function initRenderStack() {
       const { RenderingEngine, Enums } = await import("@cornerstonejs/core");
 
       const { ViewportType } = Enums;
 
-      const imageIds = [imageId];
-      // const imageIds = [];
-
-      const renderingEngine = new RenderingEngine(RENDERING_ENGINE_ID);
+      const renderingEngine = new RenderingEngine(renderingEngineId);
       if (viewer.current) {
         const viewerElement = viewer.current;
         const viewportInput = {
@@ -28,10 +88,6 @@ export default function Viewer() {
 
         const viewport = renderingEngine?.getViewport(VIEWPORT_ID);
 
-        if (imageIds.length > 0) {
-          viewport?.setStack(imageIds, 0);
-        }
-
         viewport?.render();
       }
     }
@@ -42,21 +98,25 @@ export default function Viewer() {
         ToolGroupManager,
         ZoomTool,
         WindowLevelTool,
+        LengthTool,
+        PanTool,
+        utilities,
         Enums: csToolsEnums,
       } = cornerstoneTools;
+      cornerstoneTools.removeTool(ZoomTool);
+      cornerstoneTools.removeTool(WindowLevelTool);
+      cornerstoneTools.removeTool(LengthTool);
+      cornerstoneTools.removeTool(PanTool);
       cornerstoneTools.addTool(ZoomTool);
       cornerstoneTools.addTool(WindowLevelTool);
+      cornerstoneTools.addTool(LengthTool);
+      cornerstoneTools.addTool(PanTool);
       const toolGroup = ToolGroupManager.createToolGroup(TOOL_GROUP_ID);
       toolGroup?.addTool(ZoomTool.toolName);
       toolGroup?.addTool(WindowLevelTool.toolName);
-      toolGroup?.addViewport(VIEWPORT_ID, RENDERING_ENGINE_ID);
-      toolGroup?.setToolActive(ZoomTool.toolName, {
-        bindings: [
-          {
-            mouseButton: csToolsEnums.MouseBindings.Secondary,
-          },
-        ],
-      });
+      toolGroup?.addTool(LengthTool.toolName);
+      toolGroup?.addTool(PanTool.toolName);
+      toolGroup?.addViewport(VIEWPORT_ID, renderingEngineId);
       toolGroup?.setToolActive(WindowLevelTool.toolName, {
         bindings: [
           {
@@ -64,19 +124,10 @@ export default function Viewer() {
           },
         ],
       });
-    }
-
-    async function initInfo(imageId: string) {
-      const { metaData } = await import("@cornerstonejs/core");
-      const imagePixelModule = metaData.get("imagePixelModule", imageId);
-      setInfos(() => {
-        return Object.entries(imagePixelModule);
-      });
+      setCurrentToolName(WindowLevelTool.toolName);
     }
 
     async function init() {
-      const exampleImageId = "wadouri:dicom_00000001_000.dcm";
-
       console.time("initDemo");
       const initDemo = await import("../utils/demo/helpers/initDemo")
         .then((module) => module.default)
@@ -87,77 +138,182 @@ export default function Viewer() {
       console.timeEnd("initDemo");
 
       console.time("initRenderStack");
-      await initRenderStack(exampleImageId);
+      await initRenderStack();
       console.timeEnd("initRenderStack");
 
       console.time("initToolGroup");
       await initToolGroup();
       console.timeEnd("initToolGroup");
 
-      console.time("initInfo");
-      await initInfo(exampleImageId);
-      console.timeEnd("initInfo");
+      // if (imageIds.length > 0) {
+      //   console.time("loadInfo");
+      //   await loadInfo(imageIds[0]);
+      //   console.timeEnd("loadInfo");
+      // }
+      setImageIds(() => ["wadouri:I0000164.dcm"]);
     }
     init();
-  }, []);
+  }, [renderingEngineId]);
+
+  useEffect(() => {
+    async function changeViewerImage() {
+      const { getRenderingEngine } = await import("@cornerstonejs/core");
+      const renderingEngine = getRenderingEngine(renderingEngineId);
+      const viewport = renderingEngine?.getViewport(VIEWPORT_ID);
+      await viewport?.setStack(imageIds, 0);
+      viewport?.render();
+
+      const { metaData } = await import("@cornerstonejs/core");
+      const metaDataTypes = [
+        "transferSyntax",
+        "sopCommonModule",
+        "imagePixelModule",
+        "voiLutModule",
+      ];
+      const currentInfos: Array<Object> = metaDataTypes
+        .map((metaDataType) => metaData.get(metaDataType, imageIds[0]))
+        .filter((metaData) => !!metaData)
+        .map((metaData) =>
+          Object.entries(metaData).map(([key, value]) => {
+            return { key: key, value: value };
+          })
+        )
+        .reduce((prev, curr) => [...prev, ...curr], []);
+      setInfos(() =>
+        currentInfos.map((obj, idx) => {
+          return { ...obj, id: idx };
+        })
+      );
+    }
+    if (imageIds.length > 0) {
+      setIsSnackOpen(false);
+      changeViewerImage();
+    } else {
+      setIsSnackOpen(true);
+    }
+  }, [renderingEngineId, imageIds]);
+
   return (
-    <div>
-      <input
-        type="file"
-        accept="*/dicom"
-        onChange={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          console.log(event.target.files);
-
-          if (event.target.files) {
-            async function render() {
-              const cornerstoneDICOMImageLoader = await import(
-                "@cornerstonejs/dicom-image-loader"
-              );
-              console.log(cornerstoneDICOMImageLoader);
-              const imageId =
-                cornerstoneDICOMImageLoader.wadouri.fileManager.add(
-                  event.target.files[0]
-                );
-
-              const { getRenderingEngine } = await import(
-                "@cornerstonejs/core"
-              );
-              const renderingEngine = getRenderingEngine(RENDERING_ENGINE_ID);
-              console.log(renderingEngine);
-              const viewport = renderingEngine?.getViewport(VIEWPORT_ID);
-              viewport.setStack([imageId], 0);
-              viewport?.render();
+    <ThemeProvider theme={darkTheme}>
+      <CssBaseline />
+      <Paper>
+        <input
+          type="file"
+          accept="*/dicom"
+          onChange={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.target.files) {
+              loadImageIds(event.target.files);
             }
-            render();
-          }
-        }}
-      ></input>
-      <div
-        id="viewer"
-        ref={viewer}
-        style={{ width: "500px", height: "500px" }}
-      ></div>
-      <div>
-        <table>
-          <caption>DICOM Info</caption>
-          <tbody>
-            <tr>
-              <th id="dicom-info-key">Key</th>
-              <th id="dicom-info-value">Value</th>
-            </tr>
-            {infos.map(([key, value]) => {
-              return (
-                <tr key={key}>
-                  <td>{key}</td>
-                  <td>{value}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          }}
+        ></input>
+        <Grid container>
+          <Grid item xs={1}>
+            <MenuList>
+              <MenuItem
+                onClick={() => {
+                  async function changeToolAcitveToLevel() {
+                    const { WindowLevelTool } = await import(
+                      "@cornerstonejs/tools"
+                    );
+                    changeToolActive(WindowLevelTool.toolName);
+                  }
+                  changeToolAcitveToLevel();
+                }}
+              >
+                <ListItemIcon>
+                  <ContrastIcon></ContrastIcon>
+                </ListItemIcon>
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  async function changeToolAcitveToZoom() {
+                    const { PanTool } = await import("@cornerstonejs/tools");
+                    changeToolActive(PanTool.toolName);
+                  }
+                  changeToolAcitveToZoom();
+                }}
+              >
+                <ListItemIcon>
+                  <OpenWithIcon></OpenWithIcon>
+                </ListItemIcon>
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  async function changeToolAcitveToZoom() {
+                    const { ZoomTool } = await import("@cornerstonejs/tools");
+                    changeToolActive(ZoomTool.toolName);
+                  }
+                  changeToolAcitveToZoom();
+                }}
+              >
+                <ListItemIcon>
+                  <ZoomIn></ZoomIn>
+                </ListItemIcon>
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  async function changeToolAcitveToLength() {
+                    const { LengthTool } = await import("@cornerstonejs/tools");
+                    changeToolActive(LengthTool.toolName);
+                  }
+                  changeToolAcitveToLength();
+                }}
+              >
+                <ListItemIcon>
+                  <StraightenIcon></StraightenIcon>
+                </ListItemIcon>
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  async function resetView() {
+                    const { getRenderingEngine } = await import(
+                      "@cornerstonejs/core"
+                    );
+                    const renderingEngine =
+                      getRenderingEngine(renderingEngineId);
+                    const viewport = renderingEngine?.getViewport(VIEWPORT_ID);
+                    viewport?.resetCamera();
+                    viewport?.resetProperties();
+                    viewport?.render();
+                  }
+                  resetView();
+                }}
+              >
+                <ListItemIcon>
+                  <ReplayIcon></ReplayIcon>
+                </ListItemIcon>
+              </MenuItem>
+            </MenuList>
+          </Grid>
+          <Grid item xs md>
+            <div
+              id="viewer"
+              ref={viewer}
+              style={{ maxWidth: "40rem", aspectRatio: 1, margin: "0 auto" }}
+            ></div>
+          </Grid>
+        </Grid>
+
+        {infos.length > 0 && (
+          <Grid container>
+            <Grid item md={1}></Grid>
+            <Grid item xs={12} md>
+              <DataGrid rows={infos} columns={dicomInfoColumns}></DataGrid>
+            </Grid>
+            <Grid item md={1}></Grid>
+          </Grid>
+        )}
+        <Snackbar
+          open={isSnackOpen}
+          onClose={() => {
+            setIsSnackOpen(false);
+          }}
+        >
+          <Alert severity="info">DICOM 파일을 업로드해주세요.</Alert>
+        </Snackbar>
+      </Paper>
+    </ThemeProvider>
   );
 }
