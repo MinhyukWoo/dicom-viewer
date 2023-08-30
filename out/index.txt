@@ -1,5 +1,5 @@
 1:HL["https://minhyukwoo.github.io/dicom-viewer/_next/static/css/0ce6678bfbc8d0e6.css",{"as":"style"}]
-0:["nyuwS9CxJ7PNpKRZjBu9F",[[["",{"children":["__PAGE__",{}]},"$undefined","$undefined",true],"$L2",[[["$","link","0",{"rel":"stylesheet","href":"https://minhyukwoo.github.io/dicom-viewer/_next/static/css/0ce6678bfbc8d0e6.css","precedence":"next"}]],"$L3"]]]]
+0:["-GGrkjFggsSfFu54yk0CG",[[["",{"children":["__PAGE__",{}]},"$undefined","$undefined",true],"$L2",[[["$","link","0",{"rel":"stylesheet","href":"https://minhyukwoo.github.io/dicom-viewer/_next/static/css/0ce6678bfbc8d0e6.css","precedence":"next"}]],"$L3"]]]]
 4:I{"id":47767,"chunks":["272:static/chunks/webpack-d7afe938197bfbd4.js","971:static/chunks/fd9d1056-c06adc43b46a9300.js","596:static/chunks/596-4e012787e9f48629.js"],"name":"default","async":false}
 5:I{"id":57920,"chunks":["272:static/chunks/webpack-d7afe938197bfbd4.js","971:static/chunks/fd9d1056-c06adc43b46a9300.js","596:static/chunks/596-4e012787e9f48629.js"],"name":"default","async":false}
 7:I{"id":63222,"chunks":["222:static/chunks/222-92f40e6a4b3ea079.js","931:static/chunks/app/page-291c3251ad45fc8e.js"],"name":"Image","async":false}
