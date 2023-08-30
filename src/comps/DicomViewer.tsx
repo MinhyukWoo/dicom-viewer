@@ -211,7 +211,7 @@ export default function DicomViewer() {
               loadImageIds(event.target.files);
             }
           }}
-          style={{width: "100%"}}
+          style={{ width: "100%" }}
         ></input>
         <Grid container>
           <Grid item xs={1}>
@@ -298,17 +298,28 @@ export default function DicomViewer() {
             <div
               id="viewer"
               ref={viewer}
-              style={{ maxWidth: "30rem", aspectRatio: 1, margin: "0 auto" }}
+              style={{
+                maxWidth: "30rem",
+                aspectRatio: 1,
+                margin: "0 auto",
+              }}
             ></div>
           </Grid>
           <Grid item xs md>
             <canvas
               id="canvas-output"
-              style={{ maxWidth: "30rem", aspectRatio: 1, margin: "0 auto" }}
+              style={{
+                maxWidth: "30rem",
+                aspectRatio: 1,
+                margin: "0 auto",
+              }}
             ></canvas>
           </Grid>
+
+          <Grid item xs={3}>
+            <FilterMenu></FilterMenu>
+          </Grid>
         </Grid>
-        <FilterMenu></FilterMenu>
         {infos.length > 0 && (
           <Grid container>
             <Grid item md={1}></Grid>

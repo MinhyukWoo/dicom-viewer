@@ -1,10 +1,12 @@
 import { Grid, Stack } from "@mui/material";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import DetailsIcon from "@mui/icons-material/Details";
 import { useOpenCv } from "opencv-react";
 import { Box, Switch, Button, Slider } from "@mui/material";
+import ssim from "ssim.js";
 
-const initConvVal = 9;
+const initSharpMedian = 9;
+const initSharpKernelSize = 3;
 const initGammaVal = 1.0;
 const initBlackVal = 1.0;
 const initWhiteVal = 1.0;
@@ -14,10 +16,53 @@ const initClaheOn = false;
 const initGaussianBlurOn = false;
 const initClaheLimit = 40;
 const initClaheKernelSize = 8;
+const initBlurKernelSize = 3;
+const initBlurWeight = 1.0;
+const initIsNoiseOn = false;
+const initNoiseStdDev = 20.0;
+const canvasInputId = "canvas-input";
+const canvasOutputId = "canvas-output";
+
+const calculatePSNR = (
+  cv: any,
+  image0: any,
+  image1: any,
+  maxVal: number = 255
+) => {
+  image0.convertTo(image0, cv.CV_32F);
+  image1.convertTo(image1, cv.CV_32F);
+  const tmp = new cv.Mat();
+  cv.subtract(image0, image1, tmp);
+  cv.multiply(tmp, tmp, tmp);
+  const mse = Math.max(Number.EPSILON, cv.mean(tmp)[0]);
+  const psnrVal = 20 * Math.log10(maxVal / Math.sqrt(mse));
+  return psnrVal;
+};
+
+const calculateSSIM = () => {
+  const canvas0 = document.getElementById(canvasInputId);
+  const canvas1 = document.getElementById(canvasOutputId);
+  if (
+    canvas0 instanceof HTMLCanvasElement &&
+    canvas1 instanceof HTMLCanvasElement
+  ) {
+    const ctx0 = canvas0.getContext("2d");
+    const ctx1 = canvas1.getContext("2d");
+    const imageData0 = ctx0?.getImageData(0, 0, canvas0.width, canvas0.height);
+    const imageData1 = ctx1?.getImageData(0, 0, canvas1.width, canvas1.height);
+    const { mssim } =
+      imageData0 && imageData1 ? ssim(imageData0, imageData1) : { mssim: NaN };
+    return mssim;
+  } else {
+    return NaN;
+  }
+};
 
 export default function FilterMenu() {
   const openCvData = useOpenCv();
-  const [convVal, setConvVal] = useState<number>(initConvVal);
+  const [sharpMedian, setSharpMedian] = useState<number>(initSharpMedian);
+  const [sharpKernelSize, setSharpKernelSize] =
+    useState<number>(initSharpKernelSize);
   const [gammaVal, setGammaVal] = useState<number>(initGammaVal);
   const [blackVal, setBlackVal] = useState<number>(initBlackVal);
   const [whiteVal, setWhiteVal] = useState<number>(initWhiteVal);
@@ -28,7 +73,15 @@ export default function FilterMenu() {
   const [isGaussianBlurOn, setIsGaussianBlurOn] =
     useState<boolean>(initGaussianBlurOn);
   const [claheLimit, setCalheLimit] = useState<number>(initClaheLimit);
-  const [claheKernelSize, setClaheKernelSize] = useState<number>();
+  const [claheKernelSize, setClaheKernelSize] =
+    useState<number>(initClaheKernelSize);
+  const [blurKernelSize, setBlurKernelSize] =
+    useState<number>(initBlurKernelSize);
+  const [blurWeight, setBlurWeight] = useState<number>(initBlurWeight);
+  const [isNoiseOn, setIsNoiseOn] = useState<boolean>(initIsNoiseOn);
+  const [noiseStdDev, setNoiseStdDev] = useState<number>(initNoiseStdDev);
+  const [psnrScore, setPsnrScore] = useState<number>(0);
+  const [ssimScore, setSsimScore] = useState<number>(0);
 
   const applyGammaCorrection = (cv: any, image: any, factor: number) => {
     const dst = image.clone();
@@ -71,13 +124,30 @@ export default function FilterMenu() {
     return dst;
   };
 
-  const applyFilter2D = (cv: any, image: any, factor: number) => {
-    let dst = new cv.Mat();
-    const kerenlArr = [-1, -1, -1, -1, factor as number, -1, -1, -1, -1];
-    let kernel = cv.matFromArray(3, 3, cv.CV_32FC1, kerenlArr);
-    let anchor = new cv.Point(-1, -1);
-    cv.filter2D(image, dst, cv.CV_8U, kernel, anchor, 0, cv.BORDER_DEFAULT);
-    return dst;
+  const applyFilter2D = (
+    cv: any,
+    image: any,
+    medianVal: number = initSharpMedian,
+    kernelSize: number = initSharpKernelSize
+  ) => {
+    if (kernelSize % 2 === 1) {
+      const dst = new cv.Mat();
+      const othVal = (1 - medianVal) / (kernelSize * kernelSize - 1);
+      const kernelArr = new Array(kernelSize * kernelSize).fill(othVal);
+      const medianInx = (1 + kernelSize * kernelSize) / 2;
+      kernelArr[medianInx] = medianVal;
+      const kernel = cv.matFromArray(
+        kernelSize,
+        kernelSize,
+        cv.CV_32FC1,
+        kernelArr
+      );
+      const anchor = new cv.Point(-1, -1);
+      cv.filter2D(image, dst, cv.CV_8U, kernel, anchor, 0, cv.BORDER_DEFAULT);
+      return dst;
+    } else {
+      return image;
+    }
   };
 
   const applyHistEqualization = (cv: any, image: any) => {
@@ -89,37 +159,44 @@ export default function FilterMenu() {
   const applyClahe = (
     cv: any,
     image: any,
-    kernelSize: number = initClaheKernelSize,
+    tileGridSize: number = initClaheKernelSize,
     limit: number = initClaheLimit
   ) => {
     const equalDst = new cv.Mat();
     const dst = new cv.Mat();
     cv.equalizeHist(image, equalDst);
-    const tileGridSize = new cv.Size(kernelSize, kernelSize);
-    const clahe = new cv.CLAHE(limit, tileGridSize);
+    const clahe = new cv.CLAHE(limit, new cv.Size(tileGridSize, tileGridSize));
     clahe.apply(image, dst);
     equalDst.delete();
     clahe.delete();
     return dst;
   };
 
-  const applyGaussianBlur = (cv: any, image: any, kernelSize: number = 3) => {
+  const applyGaussianBlur = (
+    cv: any,
+    image: any,
+    kernelSize: number = initBlurKernelSize,
+    blurWeight: number = initBlurWeight
+  ) => {
     const dst = new cv.Mat();
     const ksize = new cv.Size(kernelSize, kernelSize);
     cv.GaussianBlur(image, dst, ksize, 0, 0, cv.BORDER_DEFAULT);
-    cv.addWeighted(image, 0.5, dst, 0.5, 0, dst);
+    cv.addWeighted(image, 1 - blurWeight, dst, blurWeight, 0, dst);
     return dst;
   };
 
-  const applyNoise = (cv: any, image: any, factor: number) => {
-    const zeroScalar = new cv.Scalar(0);
-    const maxScalar = new cv.Scalar(255);
-    const noise = new cv.Mat(image.rows, image.cols, cv.CV_8UC1);
-    const minArray = new cv.Mat(image.rows, image.cols, cv.CV_8UC1, zeroScalar);
-    const maxArray = new cv.Mat(image.rows, image.cols, cv.CV_8UC1, maxScalar);
-    console.log(minArray);
-    cv.randu(noise, minArray, maxArray);
-    console.log(noise);
+  const applyNoiseAdjustment = (
+    cv: any,
+    image: any,
+    stdDev: number = initNoiseStdDev
+  ) => {
+    const noise = new cv.Mat(image.rows, image.cols, cv.CV_8U);
+    const means = cv.matFromArray(1, 1, cv.CV_32F, [0]);
+    const stdDevs = cv.matFromArray(1, 1, cv.CV_32F, [stdDev]);
+    cv.randn(noise, means, stdDevs);
+    const dst = new cv.Mat();
+    cv.add(image, noise, dst);
+    return dst;
   };
 
   async function applyFilter() {
@@ -144,34 +221,66 @@ export default function FilterMenu() {
         const histEqulized = isHistEqualOn
           ? await applyHistEqualization(cv, whiteCompressed)
           : whiteCompressed;
-        const clahe = isClaheOn
-          ? await applyClahe(cv, histEqulized, claheKernelSize, claheLimit)
+        const noiseAdjusted = isNoiseOn
+          ? await applyNoiseAdjustment(cv, histEqulized, noiseStdDev)
           : histEqulized;
+        const clahe = isClaheOn
+          ? await applyClahe(cv, noiseAdjusted, claheKernelSize, claheLimit)
+          : noiseAdjusted;
         const gaussianBlurred = isGaussianBlurOn
-          ? await applyGaussianBlur(cv, image)
+          ? await applyGaussianBlur(cv, clahe, blurKernelSize, blurWeight)
           : clahe;
         const postSharpened = isConvOn
-          ? await applyFilter2D(cv, gaussianBlurred, convVal)
+          ? await applyFilter2D(
+              cv,
+              gaussianBlurred,
+              sharpMedian,
+              sharpKernelSize
+            )
           : gaussianBlurred;
         await cv.imshow("canvas-output", postSharpened);
-        // image.delete();
-        // gammaCorrected.delete();
-        // blackCompressed.delete();
+        setPsnrScore(calculatePSNR(cv, image, postSharpened));
+        setSsimScore(calculateSSIM());
       }
     }
   }
+
+  useEffect(() => {
+    applyFilter();
+  }, [
+    sharpMedian,
+    sharpKernelSize,
+    gammaVal,
+    blackVal,
+    whiteVal,
+    isConvOn,
+    isHistEqualOn,
+    isClaheOn,
+    isGaussianBlurOn,
+    claheLimit,
+    claheKernelSize,
+    blurKernelSize,
+    blurWeight,
+    isNoiseOn,
+    noiseStdDev,
+  ]);
 
   function resetFilterOptions() {
     setIsConvOn(initIsConvOn);
     setIsHistEqualOn(initIsHistEqualOn);
     setIsClaheOn(initClaheOn);
-    setConvVal(initConvVal);
+    setSharpMedian(initSharpMedian);
+    setSharpKernelSize(initSharpKernelSize);
     setGammaVal(initGammaVal);
     setBlackVal(initBlackVal);
     setWhiteVal(initWhiteVal);
     setIsGaussianBlurOn(initGaussianBlurOn);
     setClaheKernelSize(initClaheKernelSize);
     setCalheLimit(initClaheLimit);
+    setBlurKernelSize(initBlurKernelSize);
+    setBlurWeight(initBlurWeight);
+    setIsNoiseOn(initIsNoiseOn);
+    setNoiseStdDev(initNoiseStdDev);
   }
   return (
     <Grid container>
@@ -218,7 +327,7 @@ export default function FilterMenu() {
             ></Slider>
           </Box>
           <Box>
-            Equalize Histogram
+            Histogram Equalization
             <Switch
               checked={isHistEqualOn}
               onChange={(event) => {
@@ -227,7 +336,7 @@ export default function FilterMenu() {
             ></Switch>
           </Box>
           <Box>
-            CLAHE(Constrast Limited Adaptive Equalize Histogram)
+            CLAHE
             <Switch
               checked={isClaheOn}
               onChange={(event) => {
@@ -237,9 +346,8 @@ export default function FilterMenu() {
             {isClaheOn && (
               <Stack>
                 <Grid container>
-                  <Grid item xs={1}></Grid>
-                  <Grid item xs={2}>
-                    Tile Grid Size
+                  <Grid item xs>
+                    - Tile Grid Size
                   </Grid>
                   <Grid item xs>
                     <Slider
@@ -259,9 +367,8 @@ export default function FilterMenu() {
                   </Grid>
                 </Grid>
                 <Grid container>
-                  <Grid item xs={1}></Grid>
-                  <Grid item xs={2}>
-                    Limit
+                  <Grid item xs>
+                    - Clip Limit
                   </Grid>
                   <Grid item xs>
                     <Slider
@@ -284,16 +391,98 @@ export default function FilterMenu() {
             )}
           </Box>
           <Box>
-            Definition Enhancement(Gaussian Blurring & Weight sum)
+            Noise Adjustment
+            <Switch
+              checked={isNoiseOn}
+              onChange={(event) => {
+                setIsNoiseOn(event.target.checked);
+              }}
+            ></Switch>
+            {isNoiseOn && (
+              <Stack>
+                <Grid container>
+                  <Grid item xs>
+                    - Scale
+                  </Grid>
+                  <Grid item xs>
+                    <Slider
+                      valueLabelDisplay="auto"
+                      step={1}
+                      min={0}
+                      max={100}
+                      value={
+                        typeof noiseStdDev === "number"
+                          ? noiseStdDev
+                          : initNoiseStdDev
+                      }
+                      onChange={(event: Event, newValue: number | number[]) => {
+                        setNoiseStdDev(newValue as number);
+                      }}
+                    ></Slider>
+                  </Grid>
+                </Grid>
+              </Stack>
+            )}
+          </Box>
+          <Box>
+            Definition Enhancement
+            {/* Gaussian Blurring & Weight sum */}
             <Switch
               checked={isGaussianBlurOn}
               onChange={(event) => {
                 setIsGaussianBlurOn(event.target.checked);
               }}
             ></Switch>
+            {isGaussianBlurOn && (
+              <Stack>
+                <Grid container>
+                  <Grid item xs>
+                    - Kernel Size
+                  </Grid>
+                  <Grid item xs>
+                    <Slider
+                      valueLabelDisplay="auto"
+                      step={2}
+                      min={3}
+                      max={15}
+                      value={
+                        typeof blurKernelSize === "number"
+                          ? blurKernelSize
+                          : initBlurKernelSize
+                      }
+                      onChange={(event: Event, newValue: number | number[]) => {
+                        setBlurKernelSize(newValue as number);
+                      }}
+                    ></Slider>
+                  </Grid>
+                </Grid>
+                <Grid container>
+                  <Grid item xs>
+                    - Blur Weight
+                  </Grid>
+                  <Grid item xs>
+                    <Slider
+                      valueLabelDisplay="auto"
+                      step={0.1}
+                      min={-1}
+                      max={1}
+                      value={
+                        typeof blurWeight === "number"
+                          ? blurWeight
+                          : initBlurWeight
+                      }
+                      onChange={(event: Event, newValue: number | number[]) => {
+                        setBlurWeight(newValue as number);
+                      }}
+                    ></Slider>
+                  </Grid>
+                </Grid>
+              </Stack>
+            )}
           </Box>
           <Box>
-            Sharpen Filter (Simple Convolution)
+            Sharpen Filter
+            {/* Simple Convolution */}
             <Switch
               checked={isConvOn}
               onChange={(event) => {
@@ -301,16 +490,50 @@ export default function FilterMenu() {
               }}
             ></Switch>
             {isConvOn && (
-              <Slider
-                valueLabelDisplay="auto"
-                step={1}
-                min={0}
-                max={10}
-                value={typeof convVal === "number" ? convVal : 9}
-                onChange={(event: Event, newValue: number | number[]) => {
-                  setConvVal(newValue as number);
-                }}
-              ></Slider>
+              <Stack>
+                <Grid container>
+                  <Grid item xs>
+                    - Median Value
+                  </Grid>
+                  <Grid item xs>
+                    <Slider
+                      valueLabelDisplay="auto"
+                      step={1}
+                      min={1}
+                      max={20}
+                      value={
+                        typeof sharpMedian === "number"
+                          ? sharpMedian
+                          : initSharpMedian
+                      }
+                      onChange={(event: Event, newValue: number | number[]) => {
+                        setSharpMedian(newValue as number);
+                      }}
+                    ></Slider>
+                  </Grid>
+                </Grid>
+                <Grid container>
+                  <Grid item xs>
+                    - Kerenl Size
+                  </Grid>
+                  <Grid item xs>
+                    <Slider
+                      valueLabelDisplay="auto"
+                      step={2}
+                      min={3}
+                      max={15}
+                      value={
+                        typeof sharpKernelSize === "number"
+                          ? sharpKernelSize
+                          : initSharpKernelSize
+                      }
+                      onChange={(event: Event, newValue: number | number[]) => {
+                        setSharpKernelSize(newValue as number);
+                      }}
+                    ></Slider>
+                  </Grid>
+                </Grid>
+              </Stack>
             )}
           </Box>
           <Grid container>
@@ -329,6 +552,11 @@ export default function FilterMenu() {
               </Button>
             </Grid>
           </Grid>
+          <Stack>
+            <Box>Score</Box>
+            <Box>- PSNR: {psnrScore.toFixed(5)}</Box>
+            <Box>- SSIM: {ssimScore.toFixed(5)}</Box>
+          </Stack>
         </Stack>
       </Grid>
       <Grid item md={2}></Grid>
