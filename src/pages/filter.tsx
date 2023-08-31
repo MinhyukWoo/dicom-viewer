@@ -1,6 +1,6 @@
 import { OpenCvProvider, useOpenCv } from "opencv-react";
 import { useEffect } from "react";
-import DicomViewer from "@/comps/DicomViewer";
+import DicomViewer from "@/components/DicomViewer";
 
 export default function Filter() {
   const onLoaded = (cv: any) => {

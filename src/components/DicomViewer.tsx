@@ -193,6 +193,7 @@ export default function DicomViewer() {
         canvasInput.id = "canvas-input";
         const src = cv.imread("canvas-input");
         cv.imshow("canvas-output", src);
+        src.delete();
       }
     }
   }, [renderingEngineId, imageIds, openCvData]);
