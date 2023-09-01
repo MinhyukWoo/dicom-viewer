@@ -295,27 +295,28 @@ export default function DicomViewer() {
               </MenuItem>
             </MenuList>
           </Grid>
-          <Grid item xs md>
-            <div
-              id="viewer"
-              ref={viewer}
-              style={{
-                maxWidth: "30rem",
-                aspectRatio: 1,
-                margin: "0 auto",
-              }}
-            ></div>
+          <Grid item xs md container alignItems="center" >
+            <Grid item xs md>
+              <div
+                id="viewer"
+                ref={viewer}
+                style={{
+                  maxWidth: "30rem",
+                  aspectRatio: 1,
+                  margin: "0 auto",
+                }}
+              ></div>
+            </Grid>
+            <Grid item xs md>
+              <canvas
+                id="canvas-output"
+                style={{
+                  maxWidth: "30rem",
+                  margin: "0 auto",
+                }}
+              ></canvas>
+            </Grid>
           </Grid>
-          <Grid item xs md>
-            <canvas
-              id="canvas-output"
-              style={{
-                maxWidth: "30rem",
-                margin: "0 auto",
-              }}
-            ></canvas>
-          </Grid>
-
           <Grid item xs={3}>
             <FilterMenu imageId={imageIds[0]}></FilterMenu>
           </Grid>
