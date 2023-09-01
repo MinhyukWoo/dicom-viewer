@@ -11,6 +11,7 @@ import {
   applyClahe,
   applyGaussianBlur,
   applyNoiseAdjustment,
+  applyWindowLeveling,
 } from "../utils/image/process";
 import {
   calculatePSNR,
@@ -36,7 +37,7 @@ const initNoiseStdDev = 20.0;
 const canvasInputId = "canvas-input";
 const canvasOutputId = "canvas-output";
 
-export default function FilterMenu() {
+export default function FilterMenu(props: any) {
   const openCvData = useOpenCv();
   const [sharpMedian, setSharpMedian] = useState<number>(initSharpMedian);
   const [sharpKernelSize, setSharpKernelSize] =
@@ -64,16 +65,24 @@ export default function FilterMenu() {
 
   async function applyFilter() {
     if (openCvData && openCvData.loaded) {
+      const { imageLoader, metaData } = await import("@cornerstonejs/core");
+      const imageData = await imageLoader.loadImage(props.imageId);
+      const imageMeta = await metaData.get("imagePixelModule", props.imageId);
       const { cv } = openCvData;
+      const imageType = imageMeta.bitsStored === 8 ? cv.CV_8U : cv.CV_16U;
       const canvasInput: HTMLCanvasElement | null =
         document.querySelector("#viewer canvas");
       if (canvasInput) {
-        const image = await cv.imread(canvasInputId);
-        cv.cvtColor(image, image, cv.COLOR_RGBA2GRAY, 0);
+        const image = await new cv.matFromArray(
+          imageData.rows,
+          imageData.columns,
+          cv.CV_32FC1,
+          imageData.getPixelData()
+        );
         const org = image.clone();
-        await applyGammaCorrection(cv, image, gammaVal);
-        await applyBlackCompression(cv, image, blackVal);
-        await applyWhiteCompression(cv, image, whiteVal);
+        await applyGammaCorrection(cv, image, gammaVal, imageType);
+        await applyBlackCompression(cv, image, blackVal, imageType);
+        await applyWhiteCompression(cv, image, whiteVal, imageType);
         if (isHistEqualOn) {
           await applyHistEqualization(cv, image);
         }
@@ -81,26 +90,65 @@ export default function FilterMenu() {
           await applyClahe(cv, image, claheKernelSize, claheLimit);
         }
         if (isNoiseOn) {
-          await applyNoiseAdjustment(cv, image, noiseStdDev);
+          await applyNoiseAdjustment(cv, image, noiseStdDev, imageType);
         }
         if (isGaussianBlurOn) {
           await applyGaussianBlur(cv, image, blurKernelSize, blurWeight);
         }
         if (isConvOn) {
-          await applyFilter2D(cv, image, sharpMedian, sharpKernelSize);
+          await applyFilter2D(
+            cv,
+            image,
+            sharpMedian,
+            sharpKernelSize,
+            imageType
+          );
         }
-        await cv.imshow(canvasOutputId, image);
+        const imageDisplayed = image.clone();
+        applyWindowLeveling(
+          cv,
+          imageDisplayed,
+          imageData.windowCenter as number,
+          imageData.windowWidth as number,
+          imageType
+        );
+
+        if (imageType === cv.CV_16U) {
+          imageDisplayed.convertTo(imageDisplayed, cv.CV_8U);
+        }
+        cv.cvtColor(imageDisplayed, imageDisplayed, cv.COLOR_GRAY2RGB, 0);
+        await cv.imshow(canvasOutputId, imageDisplayed);
         await setPsnrScore(calculatePSNR(cv, org, image));
-        await setAgmScore(calculateAverageGradientMagnitude(cv, image));
-        await setSsimScore(calculateSSIM(canvasInputId, canvasOutputId));
+        await setAgmScore(
+          calculateAverageGradientMagnitude(cv, imageDisplayed)
+        );
+        // await setSsimScore(calculateSSIM(canvasInputId, canvasOutputId));
+        const tmpCanvas = await document.createElement("canvas");
+        tmpCanvas.id = "tmp-canvas";
+        tmpCanvas.style.display = "none";
+        document.body.appendChild(tmpCanvas);
+        applyWindowLeveling(
+          cv,
+          org,
+          imageData.windowCenter as number,
+          imageData.windowWidth as number,
+          imageType
+        );
+        if (imageType === cv.CV_16U) {
+          org.convertTo(org, cv.CV_8U);
+        }
+        await cv.imshow(tmpCanvas.id, org);
+        await setSsimScore(calculateSSIM(tmpCanvas.id, canvasOutputId));
+        tmpCanvas.remove();
         org.delete();
         image.delete();
+        imageDisplayed.delete();
       }
     }
   }
 
   useEffect(() => {
-    applyFilter();
+    // applyFilter();
   }, [
     sharpMedian,
     sharpKernelSize,

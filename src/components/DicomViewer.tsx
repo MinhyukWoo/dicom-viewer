@@ -311,14 +311,13 @@ export default function DicomViewer() {
               id="canvas-output"
               style={{
                 maxWidth: "30rem",
-                aspectRatio: 1,
                 margin: "0 auto",
               }}
             ></canvas>
           </Grid>
 
           <Grid item xs={3}>
-            <FilterMenu></FilterMenu>
+            <FilterMenu imageId={imageIds[0]}></FilterMenu>
           </Grid>
         </Grid>
         {infos.length > 0 && (

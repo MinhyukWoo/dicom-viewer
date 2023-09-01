@@ -55,7 +55,6 @@ const calculateAverageGradientMagnitude = (cv: any, image: any) => {
   tmp.delete();
   sobelX.delete();
   sobelY.delete();
-  console.log(val)
   return val;
 };
 

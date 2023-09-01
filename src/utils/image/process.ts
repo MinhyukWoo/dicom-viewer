@@ -1,31 +1,46 @@
-const applyGammaCorrection = (cv: any, image: any, factor: number) => {
+const applyGammaCorrection = (
+  cv: any,
+  image: any,
+  factor: number,
+  type: number
+) => {
   image.convertTo(image, cv.CV_64F);
   cv.pow(image, 1.0 / factor, image);
-  image.convertTo(image, cv.CV_8U);
+  image.convertTo(image, type);
 };
 
-const applyBlackCompression = (cv: any, image: any, factor: number) => {
+const applyBlackCompression = (
+  cv: any,
+  image: any,
+  factor: number,
+  type: number
+) => {
   const scalar = new cv.Scalar(1);
   const ones = new cv.Mat(image.rows, image.cols, cv.CV_64FC1, scalar);
   image.convertTo(image, cv.CV_64F);
   cv.multiply(image, ones, image, factor);
-  image.convertTo(image, cv.CV_8U);
+  image.convertTo(image, type);
   ones.delete();
 };
 
-const applyWhiteCompression = (cv: any, image: any, factor: number) => {
+const applyWhiteCompression = (
+  cv: any,
+  image: any,
+  factor: number,
+  type: number
+) => {
   const org = image.clone();
   const maxScalar = new cv.Scalar(255);
   const oneScalar = new cv.Scalar(1);
   const alphaScalar = new cv.Scalar(0);
-  const maxes = new cv.Mat(image.rows, image.cols, cv.CV_8UC1, maxScalar);
+  const maxes = new cv.Mat(image.rows, image.cols, type, maxScalar);
   const ones = new cv.Mat(image.rows, image.cols, cv.CV_64FC1, oneScalar);
-  const alphas = new cv.Mat(image.rows, image.cols, cv.CV_8UC1, alphaScalar);
+  const alphas = new cv.Mat(image.rows, image.cols, type, alphaScalar);
   cv.subtract(maxes, image, image);
   cv.add(image, alphas, image);
   image.convertTo(image, cv.CV_64F);
   cv.multiply(image, ones, image, 1 - factor);
-  image.convertTo(image, cv.CV_8U);
+  image.convertTo(image, type);
   cv.add(org, image, image);
   maxes.delete();
   ones.delete();
@@ -37,7 +52,8 @@ const applyFilter2D = (
   cv: any,
   image: any,
   medianVal: number,
-  kernelSize: number
+  kernelSize: number,
+  type: number
 ) => {
   const othVal = (1 - medianVal) / (kernelSize * kernelSize - 1);
   const kernelArr = new Array(kernelSize * kernelSize).fill(othVal);
@@ -50,7 +66,7 @@ const applyFilter2D = (
     kernelArr
   );
   const anchor = new cv.Point(-1, -1);
-  cv.filter2D(image, image, cv.CV_8U, kernel, anchor, 0, cv.BORDER_DEFAULT);
+  cv.filter2D(image, image, type, kernel, anchor, 0, cv.BORDER_DEFAULT);
   kernel.delete();
 };
 
@@ -85,8 +101,13 @@ const applyGaussianBlur = (
   blurred.delete();
 };
 
-const applyNoiseAdjustment = (cv: any, image: any, stdDev: number) => {
-  const noise = new cv.Mat(image.rows, image.cols, cv.CV_8U);
+const applyNoiseAdjustment = (
+  cv: any,
+  image: any,
+  stdDev: number,
+  type: number
+) => {
+  const noise = new cv.Mat(image.rows, image.cols, type);
   const means = cv.matFromArray(1, 1, cv.CV_64F, [0]);
   const stdDevs = cv.matFromArray(1, 1, cv.CV_64F, [stdDev]);
   cv.randn(noise, means, stdDevs);
@@ -94,6 +115,38 @@ const applyNoiseAdjustment = (cv: any, image: any, stdDev: number) => {
   noise.delete();
   means.delete();
   stdDevs.delete();
+};
+
+const applyWindowLeveling = (
+  cv: any,
+  image: any,
+  center: number,
+  width: number,
+  type: number
+) => {
+  image.convertTo(image, cv.CV_64F);
+  const scalar1 = new cv.Scalar(center - 0.5, 0, 0, 0);
+  const scalar2 = new cv.Scalar(width - 1, 0, 0, 0);
+  const scalar3 = new cv.Scalar(0.5, 0, 0, 0);
+  const scalarMin = new cv.Scalar(0, 0, 0, 0);
+  const scalarMax = new cv.Scalar(255, 0, 0, 0);
+  const mat1 = new cv.Mat(image.rows, image.cols, cv.CV_64F, scalar1);
+  const mat2 = new cv.Mat(image.rows, image.cols, cv.CV_64F, scalar2);
+  const mat3 = new cv.Mat(image.rows, image.cols, cv.CV_64F, scalar3);
+  const matMin = new cv.Mat(image.rows, image.cols, cv.CV_64F, scalarMin);
+  const matMax = new cv.Mat(image.rows, image.cols, cv.CV_64F, scalarMax);
+  cv.subtract(image, mat1, image);
+  cv.divide(image, mat2, image);
+  cv.add(image, mat3, image);
+  cv.multiply(image, matMax, image);
+  cv.max(image, matMin, image);
+  cv.min(image, matMax, image);
+  image.convertTo(image, type);
+  mat1.delete();
+  mat2.delete();
+  mat3.delete();
+  matMin.delete();
+  matMax.delete();
 };
 
 export {
@@ -105,4 +158,5 @@ export {
   applyClahe,
   applyGaussianBlur,
   applyNoiseAdjustment,
+  applyWindowLeveling,
 };
