@@ -1,4 +1,4 @@
-import { Grid, Stack } from "@mui/material";
+import { Alert, Grid, Snackbar, Stack } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useOpenCv } from "opencv-react";
 import { Box, Switch, Button, Slider } from "@mui/material";
@@ -36,6 +36,13 @@ const initIsNoiseOn = false;
 const initNoiseStdDev = 20.0;
 const canvasInputId = "canvas-input";
 const canvasOutputId = "canvas-output";
+const getError = (hasError: boolean, message: string) => {
+  return { hasError, message };
+};
+interface IError {
+  hasError: boolean;
+  message: string;
+}
 
 export default function FilterMenu(props: any) {
   const openCvData = useOpenCv();
@@ -62,8 +69,10 @@ export default function FilterMenu(props: any) {
   const [psnrScore, setPsnrScore] = useState<number>(0);
   const [ssimScore, setSsimScore] = useState<number>(0);
   const [agmScore, setAgmScore] = useState<number>(0);
+  const [error, setError] = useState<IError>(getError(false, ""));
 
   async function applyFilter() {
+    setError(getError(false, ""));
     if (openCvData && openCvData.loaded) {
       const { imageLoader, metaData } = await import("@cornerstonejs/core");
       const imageData = await imageLoader.loadImage(props.imageId);
@@ -84,10 +93,18 @@ export default function FilterMenu(props: any) {
         await applyBlackCompression(cv, image, blackVal, imageType);
         await applyWhiteCompression(cv, image, whiteVal, imageType);
         if (isHistEqualOn) {
-          await applyHistEqualization(cv, image);
+          try {
+            await applyHistEqualization(cv, image, imageType);
+          } catch (err: any) {
+            setError(getError(true, err.message));
+          }
         }
         if (isClaheOn) {
-          await applyClahe(cv, image, claheKernelSize, claheLimit);
+          try {
+            await applyClahe(cv, image, claheKernelSize, claheLimit, imageType);
+          } catch (err: any) {
+            setError(getError(true, err.message));
+          }
         }
         if (isNoiseOn) {
           await applyNoiseAdjustment(cv, image, noiseStdDev, imageType);
@@ -460,6 +477,22 @@ export default function FilterMenu(props: any) {
             <Box>- SSIM: {ssimScore.toFixed(5)}</Box>
             <Box>- AGM: {agmScore.toFixed(5)}</Box>
           </Stack>
+          <Snackbar
+            open={error.hasError}
+            onClose={() => {
+              setError(getError(false, ""));
+            }}
+            anchorOrigin={{ vertical: "top", horizontal: "center" }}
+          >
+            <Alert
+              severity="warning"
+              onClose={() => {
+                setError(getError(false, ""));
+              }}
+            >
+              {error.message}
+            </Alert>
+          </Snackbar>
         </Stack>
       </Grid>
       <Grid item md={2}></Grid>

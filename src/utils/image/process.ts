@@ -70,22 +70,31 @@ const applyFilter2D = (
   kernel.delete();
 };
 
-const applyHistEqualization = (cv: any, image: any) => {
-  cv.equalizeHist(image, image);
+const applyHistEqualization = (cv: any, image: any, type: number) => {
+  if (type === cv.CV_8U) {
+    cv.equalizeHist(image, image);
+  } else {
+    throw new Error("Histogram Equalization은 8bit unsigned인 DICOM 영상만 적용 가능합니다.");
+  }
 };
 
 const applyClahe = (
   cv: any,
   image: any,
   tileGridSize: number,
-  limit: number
+  limit: number,
+  type: number
 ) => {
-  const equalDst = new cv.Mat();
-  cv.equalizeHist(image, equalDst);
-  const clahe = new cv.CLAHE(limit, new cv.Size(tileGridSize, tileGridSize));
-  clahe.apply(image, image);
-  equalDst.delete();
-  clahe.delete();
+  if (type === cv.CV_8U) {
+    const equalDst = new cv.Mat();
+    cv.equalizeHist(image, equalDst);
+    const clahe = new cv.CLAHE(limit, new cv.Size(tileGridSize, tileGridSize));
+    clahe.apply(image, image);
+    equalDst.delete();
+    clahe.delete();
+  } else {
+    throw new Error("CLAHE는 8bit unsigned인 DICOM 영상만 적용 가능합니다.");
+  }
 };
 
 const applyGaussianBlur = (
