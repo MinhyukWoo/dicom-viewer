@@ -19,7 +19,7 @@ import {
   calculateAverageGradientMagnitude,
 } from "../utils/image/score";
 
-const initSharpMedian = 9;
+const initSharpCenter = 9;
 const initSharpKernelSize = 3;
 const initGammaVal = 1.0;
 const initBlackVal = 1.0;
@@ -34,6 +34,7 @@ const initBlurKernelSize = 3;
 const initBlurWeight = 1.0;
 const initIsNoiseOn = false;
 const initNoiseStdDev = 20.0;
+const initSigma = 0;
 const canvasInputId = "canvas-input";
 const canvasOutputId = "canvas-output";
 const getError = (hasError: boolean, message: string) => {
@@ -46,7 +47,7 @@ interface IError {
 
 export default function FilterMenu(props: any) {
   const openCvData = useOpenCv();
-  const [sharpMedian, setSharpMedian] = useState<number>(initSharpMedian);
+  const [sharpCenter, setSharpCenter] = useState<number>(initSharpCenter);
   const [sharpKernelSize, setSharpKernelSize] =
     useState<number>(initSharpKernelSize);
   const [gammaVal, setGammaVal] = useState<number>(initGammaVal);
@@ -70,6 +71,7 @@ export default function FilterMenu(props: any) {
   const [ssimScore, setSsimScore] = useState<number>(0);
   const [agmScore, setAgmScore] = useState<number>(0);
   const [error, setError] = useState<IError>(getError(false, ""));
+  const [sigma, setSigma] = useState<number>(initSigma);
 
   async function applyFilter() {
     setError(getError(false, ""));
@@ -110,13 +112,13 @@ export default function FilterMenu(props: any) {
           await applyNoiseAdjustment(cv, image, noiseStdDev, imageType);
         }
         if (isGaussianBlurOn) {
-          await applyGaussianBlur(cv, image, blurKernelSize, blurWeight);
+          await applyGaussianBlur(cv, image, blurKernelSize, blurWeight, sigma);
         }
         if (isConvOn) {
           await applyFilter2D(
             cv,
             image,
-            sharpMedian,
+            sharpCenter,
             sharpKernelSize,
             imageType
           );
@@ -167,7 +169,7 @@ export default function FilterMenu(props: any) {
   useEffect(() => {
     // applyFilter();
   }, [
-    sharpMedian,
+    sharpCenter,
     sharpKernelSize,
     gammaVal,
     blackVal,
@@ -188,7 +190,7 @@ export default function FilterMenu(props: any) {
     setIsConvOn(initIsConvOn);
     setIsHistEqualOn(initIsHistEqualOn);
     setIsClaheOn(initClaheOn);
-    setSharpMedian(initSharpMedian);
+    setSharpCenter(initSharpCenter);
     setSharpKernelSize(initSharpKernelSize);
     setGammaVal(initGammaVal);
     setBlackVal(initBlackVal);
@@ -396,6 +398,23 @@ export default function FilterMenu(props: any) {
                     ></Slider>
                   </Grid>
                 </Grid>
+                <Grid container>
+                  <Grid item xs>
+                    - Sigma
+                  </Grid>
+                  <Grid item xs>
+                    <Slider
+                      valueLabelDisplay="auto"
+                      step={0.1}
+                      min={0}
+                      max={3}
+                      value={typeof sigma === "number" ? sigma : initSigma}
+                      onChange={(event: Event, newValue: number | number[]) => {
+                        setSigma(newValue as number);
+                      }}
+                    ></Slider>
+                  </Grid>
+                </Grid>
               </Stack>
             )}
           </Box>
@@ -412,21 +431,21 @@ export default function FilterMenu(props: any) {
               <Stack>
                 <Grid container>
                   <Grid item xs>
-                    - Median Value
+                    - Center Value
                   </Grid>
                   <Grid item xs>
                     <Slider
                       valueLabelDisplay="auto"
                       step={1}
                       min={1}
-                      max={20}
+                      max={40}
                       value={
-                        typeof sharpMedian === "number"
-                          ? sharpMedian
-                          : initSharpMedian
+                        typeof sharpCenter === "number"
+                          ? sharpCenter
+                          : initSharpCenter
                       }
                       onChange={(event: Event, newValue: number | number[]) => {
-                        setSharpMedian(newValue as number);
+                        setSharpCenter(newValue as number);
                       }}
                     ></Slider>
                   </Grid>

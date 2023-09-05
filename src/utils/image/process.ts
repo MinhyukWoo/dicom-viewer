@@ -101,11 +101,12 @@ const applyGaussianBlur = (
   cv: any,
   image: any,
   kernelSize: number,
-  blurWeight: number
+  blurWeight: number,
+  sigma: number,
 ) => {
   const blurred = new cv.Mat();
   const ksize = new cv.Size(kernelSize, kernelSize);
-  cv.GaussianBlur(image, blurred, ksize, 0, 0, cv.BORDER_DEFAULT);
+  cv.GaussianBlur(image, blurred, ksize, sigma, sigma, cv.BORDER_DEFAULT);
   cv.addWeighted(image, 1 - blurWeight, blurred, blurWeight, 0, image);
   blurred.delete();
 };
