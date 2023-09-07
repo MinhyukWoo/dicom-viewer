@@ -57,7 +57,7 @@ const applyFilter2D = (
 ) => {
   const othVal = (1 - medianVal) / (kernelSize * kernelSize - 1);
   const kernelArr = new Array(kernelSize * kernelSize).fill(othVal);
-  const medianInx = (1 + kernelSize * kernelSize) / 2;
+  const medianInx = (1 + kernelSize * kernelSize) / 2 - 1;
   kernelArr[medianInx] = medianVal;
   const kernel = cv.matFromArray(
     kernelSize,
@@ -66,7 +66,8 @@ const applyFilter2D = (
     kernelArr
   );
   const anchor = new cv.Point(-1, -1);
-  cv.filter2D(image, image, type, kernel, anchor, 0, cv.BORDER_DEFAULT);
+  cv.filter2D(image, image, cv.CV_32F, kernel, anchor, 0, cv.BORDER_DEFAULT);
+  image.convertTo(image, type);
   kernel.delete();
 };
 
@@ -74,7 +75,9 @@ const applyHistEqualization = (cv: any, image: any, type: number) => {
   if (type === cv.CV_8U) {
     cv.equalizeHist(image, image);
   } else {
-    throw new Error("Histogram Equalization은 8bit unsigned인 DICOM 영상만 적용 가능합니다.");
+    throw new Error(
+      "Histogram Equalization은 8bit unsigned인 DICOM 영상만 적용 가능합니다."
+    );
   }
 };
 
@@ -102,7 +105,7 @@ const applyGaussianBlur = (
   image: any,
   kernelSize: number,
   blurWeight: number,
-  sigma: number,
+  sigma: number
 ) => {
   const blurred = new cv.Mat();
   const ksize = new cv.Size(kernelSize, kernelSize);
