@@ -28,8 +28,8 @@ const calculateSSIM = (canvasInputId: string, canvasOutputId: string) => {
     canvas0 instanceof HTMLCanvasElement &&
     canvas1 instanceof HTMLCanvasElement
   ) {
-    const ctx0 = canvas0.getContext("2d");
-    const ctx1 = canvas1.getContext("2d");
+    const ctx0 = canvas0.getContext("2d", { willReadFrequently: true });
+    const ctx1 = canvas1.getContext("2d", { willReadFrequently: true });
     const imageData0 = ctx0?.getImageData(0, 0, canvas0.width, canvas0.height);
     const imageData1 = ctx1?.getImageData(0, 0, canvas1.width, canvas1.height);
     const { mssim } =
@@ -51,7 +51,7 @@ const calculateAverageGradientMagnitude = (cv: any, image: any) => {
   cv.multiply(sobelY, sobelY, sobelY);
   cv.add(sobelX, sobelY, tmp);
   cv.sqrt(tmp, tmp);
-  const val = cv.mean(tmp)[0]
+  const val = cv.mean(tmp)[0];
   tmp.delete();
   sobelX.delete();
   sobelY.delete();

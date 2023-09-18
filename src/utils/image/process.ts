@@ -66,7 +66,47 @@ const applyFilter2D = (
     kernelArr
   );
   const anchor = new cv.Point(-1, -1);
-  cv.filter2D(image, image, cv.CV_32F, kernel, anchor, 0, cv.BORDER_DEFAULT);
+  cv.filter2D(image, image, cv.CV_64F, kernel, anchor, 0, cv.BORDER_DEFAULT);
+  image.convertTo(image, type);
+  kernel.delete();
+};
+
+const applyFred5x5Filter2D = (cv: any, image: any, type: number) => {
+  const kernelArr = [
+    -4, -1, 0, -1, -4, -1, 2, 3, 2, -1, 0, 3, 4, 3, 0, -1, 2, 3, 2, -1, -4, -1,
+    0, -1, -4,
+  ];
+  kernelArr[12] += 1;
+  const kernel = cv.matFromArray(5, 5, cv.CV_64FC1, kernelArr);
+  const anchor = new cv.Point(-1, -1);
+  cv.filter2D(image, image, cv.CV_64F, kernel, anchor, 0, cv.BORDER_DEFAULT);
+  image.convertTo(image, type);
+  kernel.delete();
+};
+
+const applyFred7x7Filter2D = (cv: any, image: any, type: number) => {
+  const kernelArr = [
+    -10, -5, -2, -1, -2, -5, -10, -5, 0, 3, 4, 3, 0, -5, -2, 3, 6, 7, 6, 3, -2,
+    -1, 4, 7, 8, 7, 4, -1, -2, 3, 6, 7, 6, 3, -2, -5, 0, 3, 4, 3, 0, -5, -10,
+    -5, -2, -1, -2, -5, -10,
+  ];
+  kernelArr[24] += 1;
+  const kernel = cv.matFromArray(7, 7, cv.CV_64FC1, kernelArr);
+  const anchor = new cv.Point(-1, -1);
+  cv.filter2D(image, image, cv.CV_64F, kernel, anchor, 0, cv.BORDER_DEFAULT);
+  image.convertTo(image, type);
+  kernel.delete();
+};
+
+const applyNegativeLog5x5 = (cv: any, image: any, type: number) => {
+  const kernelArr = [
+    0, 0, -1, 0, 0, 0, -1, -2, -1, 0, -1, -2, 16, -2, -1, 0, -1, -2, -1, 0, 0,
+    0, -1, 0, 0,
+  ];
+  kernelArr[12] += 1;
+  const kernel = cv.matFromArray(5, 5, cv.CV_64FC1, kernelArr);
+  const anchor = new cv.Point(-1, -1);
+  cv.filter2D(image, image, cv.CV_64F, kernel, anchor, 0, cv.BORDER_DEFAULT);
   image.convertTo(image, type);
   kernel.delete();
 };
@@ -172,4 +212,7 @@ export {
   applyGaussianBlur,
   applyNoiseAdjustment,
   applyWindowLeveling,
+  applyFred5x5Filter2D,
+  applyFred7x7Filter2D,
+  applyNegativeLog5x5,
 };

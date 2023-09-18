@@ -184,20 +184,6 @@ export default function DicomViewer() {
     }
   }, [renderingEngineId, imageIds]);
 
-  useEffect(() => {
-    if (openCvData && openCvData.loaded) {
-      const { cv } = openCvData;
-      const canvasInput: HTMLCanvasElement | null =
-        document.querySelector("#viewer canvas");
-      if (canvasInput) {
-        canvasInput.id = "canvas-input";
-        const src = cv.imread("canvas-input");
-        cv.imshow("canvas-output", src);
-        src.delete();
-      }
-    }
-  }, [renderingEngineId, imageIds, openCvData]);
-
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
@@ -295,7 +281,7 @@ export default function DicomViewer() {
               </MenuItem>
             </MenuList>
           </Grid>
-          <Grid item xs md container alignItems="center" >
+          <Grid item xs md container alignItems="center">
             <Grid item xs md>
               <div
                 id="viewer"
@@ -307,14 +293,14 @@ export default function DicomViewer() {
                 }}
               ></div>
             </Grid>
-            <Grid item xs md>
-              <canvas
+            <Grid id="canvas-output-container" item xs md>
+              {/* <canvas
                 id="canvas-output"
                 style={{
                   maxWidth: "30rem",
                   margin: "0 auto",
                 }}
-              ></canvas>
+              ></canvas> */}
             </Grid>
           </Grid>
           <Grid item xs={3}>

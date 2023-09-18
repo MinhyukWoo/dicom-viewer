@@ -1,5 +1,5 @@
-import { Alert, Grid, Snackbar, Stack } from "@mui/material";
-import { useEffect, useState } from "react";
+import { Alert, Grid, Snackbar, Stack, TextField } from "@mui/material";
+import { useState } from "react";
 import { useOpenCv } from "opencv-react";
 import { Box, Switch, Button, Slider } from "@mui/material";
 import {
@@ -12,6 +12,9 @@ import {
   applyGaussianBlur,
   applyNoiseAdjustment,
   applyWindowLeveling,
+  applyFred5x5Filter2D,
+  applyFred7x7Filter2D,
+  applyNegativeLog5x5,
 } from "../utils/image/process";
 import {
   calculatePSNR,
@@ -35,8 +38,7 @@ const initBlurWeight = 1.0;
 const initIsNoiseOn = false;
 const initNoiseStdDev = 20.0;
 const initSigma = 0;
-const canvasInputId = "canvas-input";
-const canvasOutputId = "canvas-output";
+const canvasOutputContainerId = "canvas-output-container";
 const getError = (hasError: boolean, message: string) => {
   return { hasError, message };
 };
@@ -72,6 +74,12 @@ export default function FilterMenu(props: any) {
   const [agmScore, setAgmScore] = useState<number>(0);
   const [error, setError] = useState<IError>(getError(false, ""));
   const [sigma, setSigma] = useState<number>(initSigma);
+  const [customizesWindow, setCustomizesWindow] = useState<boolean>(false);
+  const [windowCenter, setWindowCenter] = useState<number>(0);
+  const [windowWidth, setWindowWidth] = useState<number>(0);
+  const [isFred5x5, setIsFred5x5] = useState<boolean>(false);
+  const [isFred7x7, setIsFred7x7] = useState<boolean>(false);
+  const [isNlog5x5, setIsNlog5x5] = useState<boolean>(false);
 
   async function applyFilter() {
     setError(getError(false, ""));
@@ -81,13 +89,23 @@ export default function FilterMenu(props: any) {
       const imageMeta = await metaData.get("imagePixelModule", props.imageId);
       const { cv } = openCvData;
       const imageType = imageMeta.bitsStored === 8 ? cv.CV_8U : cv.CV_16U;
-      const canvasInput: HTMLCanvasElement | null =
-        document.querySelector("#viewer canvas");
-      if (canvasInput) {
+      const canvasOutputId = "canvas-output";
+      document.getElementById(canvasOutputId)?.remove();
+      const canvasOutput: HTMLCanvasElement = document.createElement("canvas");
+      canvasOutput.id = canvasOutputId;
+      canvasOutput.setAttribute(
+        "style",
+        `max-width: 30rem;
+        margin: 0 auto;`
+      );
+      document
+        .getElementById(canvasOutputContainerId)
+        ?.appendChild(canvasOutput);
+      if (imageData) {
         const image = await new cv.matFromArray(
           imageData.rows,
           imageData.columns,
-          cv.CV_32FC1,
+          imageType,
           imageData.getPixelData()
         );
         const org = image.clone();
@@ -122,13 +140,19 @@ export default function FilterMenu(props: any) {
             sharpKernelSize,
             imageType
           );
+        } else if (isNlog5x5) {
+          await applyNegativeLog5x5(cv, image, imageType);
+        } else if (isFred5x5) {
+          await applyFred5x5Filter2D(cv, image, imageType);
+        } else if (isFred7x7) {
+          await applyFred7x7Filter2D(cv, image, imageType);
         }
         const imageDisplayed = image.clone();
         applyWindowLeveling(
           cv,
           imageDisplayed,
-          imageData.windowCenter as number,
-          imageData.windowWidth as number,
+          customizesWindow ? windowCenter : (imageData.windowCenter as number),
+          customizesWindow ? windowWidth : (imageData.windowWidth as number),
           imageType
         );
 
@@ -166,26 +190,6 @@ export default function FilterMenu(props: any) {
     }
   }
 
-  useEffect(() => {
-    // applyFilter();
-  }, [
-    sharpCenter,
-    sharpKernelSize,
-    gammaVal,
-    blackVal,
-    whiteVal,
-    isConvOn,
-    isHistEqualOn,
-    isClaheOn,
-    isGaussianBlurOn,
-    claheLimit,
-    claheKernelSize,
-    blurKernelSize,
-    blurWeight,
-    isNoiseOn,
-    noiseStdDev,
-  ]);
-
   function resetFilterOptions() {
     setIsConvOn(initIsConvOn);
     setIsHistEqualOn(initIsHistEqualOn);
@@ -202,6 +206,13 @@ export default function FilterMenu(props: any) {
     setBlurWeight(initBlurWeight);
     setIsNoiseOn(initIsNoiseOn);
     setNoiseStdDev(initNoiseStdDev);
+    setSigma(initSigma);
+    setCustomizesWindow(false);
+    setWindowCenter(0);
+    setWindowWidth(0);
+    setIsFred5x5(false);
+    setIsFred7x7(false);
+    setIsNlog5x5(false);
   }
   return (
     <Grid container>
@@ -474,6 +485,76 @@ export default function FilterMenu(props: any) {
               </Stack>
             )}
           </Box>
+          <Box>
+            Negative LoG 5x5
+            <Switch
+              checked={isNlog5x5}
+              onChange={(event) => {
+                setIsNlog5x5(event.target.checked);
+              }}
+            ></Switch>
+          </Box>
+          <Box>
+            Fred 5x5 Sharpen Filter
+            <Switch
+              checked={isFred5x5}
+              onChange={(event) => {
+                setIsFred5x5(event.target.checked);
+              }}
+            ></Switch>
+          </Box>
+          <Box>
+            Fred 7x7 Sharpen Filter
+            <Switch
+              checked={isFred7x7}
+              onChange={(event) => {
+                setIsFred7x7(event.target.checked);
+              }}
+            ></Switch>
+          </Box>
+          <Box>
+            Customize Window Leveling
+            <Switch
+              checked={customizesWindow}
+              onChange={(event) => {
+                setCustomizesWindow(event.target.checked);
+              }}
+            ></Switch>
+            {customizesWindow && (
+              <Stack>
+                <Grid container>
+                  <Grid item xs>
+                    - Window Center
+                  </Grid>
+                  <Grid item xs>
+                    <TextField
+                      type="number"
+                      variant="standard"
+                      defaultValue={windowCenter}
+                      onChange={(event) => {
+                        setWindowCenter(Number.parseFloat(event.target.value));
+                      }}
+                    ></TextField>
+                  </Grid>
+                </Grid>
+                <Grid container>
+                  <Grid item xs>
+                    - Window Width
+                  </Grid>
+                  <Grid item xs>
+                    <TextField
+                      type="number"
+                      variant="standard"
+                      defaultValue={windowWidth}
+                      onChange={(event) => {
+                        setWindowWidth(Number.parseFloat(event.target.value));
+                      }}
+                    ></TextField>
+                  </Grid>
+                </Grid>
+              </Stack>
+            )}
+          </Box>
           <Grid container>
             <Grid item xs>
               <Button
@@ -490,6 +571,7 @@ export default function FilterMenu(props: any) {
               </Button>
             </Grid>
           </Grid>
+
           <Stack>
             <Box>Score</Box>
             <Box>- PSNR: {psnrScore.toFixed(5)}</Box>
