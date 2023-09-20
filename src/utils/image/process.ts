@@ -90,7 +90,7 @@ const applyFred7x7Filter2D = (cv: any, image: any, type: number) => {
     -1, 4, 7, 8, 7, 4, -1, -2, 3, 6, 7, 6, 3, -2, -5, 0, 3, 4, 3, 0, -5, -10,
     -5, -2, -1, -2, -5, -10,
   ];
-  kernelArr[24] += 1;
+  // kernelArr[24] += 1;
   const kernel = cv.matFromArray(7, 7, cv.CV_64FC1, kernelArr);
   const anchor = new cv.Point(-1, -1);
   cv.filter2D(image, image, cv.CV_64F, kernel, anchor, 0, cv.BORDER_DEFAULT);
@@ -149,8 +149,8 @@ const applyGaussianBlur = (
 ) => {
   const blurred = new cv.Mat();
   const ksize = new cv.Size(kernelSize, kernelSize);
-  cv.GaussianBlur(image, blurred, ksize, sigma, sigma, cv.BORDER_DEFAULT);
-  cv.addWeighted(image, 1 - blurWeight, blurred, blurWeight, 0, image);
+  cv.GaussianBlur(image, image, ksize, sigma, sigma, cv.BORDER_DEFAULT);
+  // cv.addWeighted(image, 1 - blurWeight, blurred, blurWeight, 0, image);
   blurred.delete();
 };
 
@@ -200,6 +200,50 @@ const applyWindowLeveling = (
   mat3.delete();
   matMin.delete();
   matMax.delete();
+};
+
+export const applyLaplacian = (
+  cv: any,
+  image: any,
+  ksize: number,
+  scale: number,
+  imageType: number
+) => {
+  const edge = new cv.Mat();
+  cv.Laplacian(image, edge, -1, ksize, scale);
+  const scalar = new cv.Scalar(-1, 0, 0, 0);
+  const mat = new cv.Mat(image.rows, image.cols, cv.CV_32S, scalar);
+
+  edge.convertTo(edge, cv.CV_32S);
+  cv.multiply(edge, mat, edge);
+  image.convertTo(image, cv.CV_32S);
+  cv.add(image, edge, image);
+  image.convertTo(image, imageType);
+
+  edge.delete();
+  mat.delete();
+};
+
+export const applySobel = (
+  cv: any,
+  image: any,
+  ksize: number,
+  imageType: number
+) => {
+  const edge = new cv.Mat();
+  const edge1 = new cv.Mat();
+  const edge2 = new cv.Mat();
+  cv.Sobel(image, edge1, -1, 1, 0, ksize);
+  cv.Sobel(image, edge2, -1, 0, 1, ksize);
+  cv.add(edge1, edge2, edge);
+  // const scalar = new cv.Scalar(-1, 0, 0, 0);
+  // const mat = new cv.Mat(image.rows, image.cols, cv.CV_64F, scalar);
+  edge.convertTo(edge, cv.CV_64F);
+  // cv.multiply(edge, mat, edge);
+  // console.log(edge);
+  image.convertTo(image, cv.CV_64F);
+  cv.add(image, edge, image);
+  image.convertTo(image, imageType);
 };
 
 export {

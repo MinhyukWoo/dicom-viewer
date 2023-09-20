@@ -15,6 +15,8 @@ import {
   applyFred5x5Filter2D,
   applyFred7x7Filter2D,
   applyNegativeLog5x5,
+  applyLaplacian,
+  applySobel,
 } from "../utils/image/process";
 import {
   calculatePSNR,
@@ -38,6 +40,8 @@ const initBlurWeight = 1.0;
 const initIsNoiseOn = false;
 const initNoiseStdDev = 20.0;
 const initSigma = 0;
+const initLaplacianScale = 1;
+const initLaplacianKsize = 3;
 const canvasOutputContainerId = "canvas-output-container";
 const getError = (hasError: boolean, message: string) => {
   return { hasError, message };
@@ -78,8 +82,12 @@ export default function FilterMenu(props: any) {
   const [windowCenter, setWindowCenter] = useState<number>(0);
   const [windowWidth, setWindowWidth] = useState<number>(0);
   const [isFred5x5, setIsFred5x5] = useState<boolean>(false);
-  const [isFred7x7, setIsFred7x7] = useState<boolean>(false);
+  const [isLaplacian, setIsLaplacian] = useState<boolean>(false);
   const [isNlog5x5, setIsNlog5x5] = useState<boolean>(false);
+  const [laplacianScale, setLaplacianScale] =
+    useState<number>(initLaplacianScale);
+  const [laplacianKsize, setLaplacianKsize] =
+    useState<number>(initLaplacianKsize);
 
   async function applyFilter() {
     setError(getError(false, ""));
@@ -144,8 +152,14 @@ export default function FilterMenu(props: any) {
           await applyNegativeLog5x5(cv, image, imageType);
         } else if (isFred5x5) {
           await applyFred5x5Filter2D(cv, image, imageType);
-        } else if (isFred7x7) {
-          await applyFred7x7Filter2D(cv, image, imageType);
+        } else if (isLaplacian) {
+          await applyLaplacian(
+            cv,
+            image,
+            laplacianKsize,
+            laplacianScale,
+            imageType
+          );
         }
         const imageDisplayed = image.clone();
         applyWindowLeveling(
@@ -165,7 +179,6 @@ export default function FilterMenu(props: any) {
         await setAgmScore(
           calculateAverageGradientMagnitude(cv, imageDisplayed)
         );
-        // await setSsimScore(calculateSSIM(canvasInputId, canvasOutputId));
         const tmpCanvas = await document.createElement("canvas");
         tmpCanvas.id = "tmp-canvas";
         tmpCanvas.style.display = "none";
@@ -173,8 +186,8 @@ export default function FilterMenu(props: any) {
         applyWindowLeveling(
           cv,
           org,
-          imageData.windowCenter as number,
-          imageData.windowWidth as number,
+          customizesWindow ? windowCenter : (imageData.windowCenter as number),
+          customizesWindow ? windowWidth : (imageData.windowWidth as number),
           imageType
         );
         if (imageType === cv.CV_16U) {
@@ -211,7 +224,7 @@ export default function FilterMenu(props: any) {
     setWindowCenter(0);
     setWindowWidth(0);
     setIsFred5x5(false);
-    setIsFred7x7(false);
+    setIsLaplacian(false);
     setIsNlog5x5(false);
   }
   return (
@@ -357,8 +370,7 @@ export default function FilterMenu(props: any) {
             )}
           </Box>
           <Box>
-            Definition Enhancement
-            {/* Gaussian Blurring & Weight sum */}
+            Gaussian Blur
             <Switch
               checked={isGaussianBlurOn}
               onChange={(event) => {
@@ -431,7 +443,6 @@ export default function FilterMenu(props: any) {
           </Box>
           <Box>
             Sharpen Filter
-            {/* Simple Convolution */}
             <Switch
               checked={isConvOn}
               onChange={(event) => {
@@ -449,7 +460,7 @@ export default function FilterMenu(props: any) {
                       valueLabelDisplay="auto"
                       step={1}
                       min={1}
-                      max={40}
+                      max={50}
                       value={
                         typeof sharpCenter === "number"
                           ? sharpCenter
@@ -504,13 +515,59 @@ export default function FilterMenu(props: any) {
             ></Switch>
           </Box>
           <Box>
-            Fred 7x7 Sharpen Filter
+            Laplacian Filter
             <Switch
-              checked={isFred7x7}
+              checked={isLaplacian}
               onChange={(event) => {
-                setIsFred7x7(event.target.checked);
+                setIsLaplacian(event.target.checked);
               }}
             ></Switch>
+            {isLaplacian && (
+              <Stack>
+                <Grid container>
+                  <Grid item xs>
+                    - Scale
+                  </Grid>
+                  <Grid item xs>
+                    <Slider
+                      valueLabelDisplay="auto"
+                      step={0.01}
+                      min={-1}
+                      max={1}
+                      value={
+                        typeof laplacianScale === "number"
+                          ? laplacianScale
+                          : initLaplacianKsize
+                      }
+                      onChange={(event: Event, newValue: number | number[]) => {
+                        setLaplacianScale(newValue as number);
+                      }}
+                    ></Slider>
+                  </Grid>
+                </Grid>
+                <Grid container>
+                  <Grid item xs>
+                    - Kerenl Size
+                  </Grid>
+                  <Grid item xs>
+                    <Slider
+                      valueLabelDisplay="auto"
+                      step={2}
+                      min={3}
+                      max={15}
+                      value={
+                        typeof laplacianKsize === "number"
+                          ? laplacianKsize
+                          : initLaplacianKsize
+                      }
+                      onChange={(event: Event, newValue: number | number[]) => {
+                        setLaplacianKsize(newValue as number);
+                      }}
+                    ></Slider>
+                  </Grid>
+                </Grid>
+              </Stack>
+            )}
           </Box>
           <Box>
             Customize Window Leveling
