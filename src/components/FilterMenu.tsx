@@ -402,27 +402,6 @@ export default function FilterMenu(props: any) {
                 </Grid>
                 <Grid container>
                   <Grid item xs>
-                    - Blur Weight
-                  </Grid>
-                  <Grid item xs>
-                    <Slider
-                      valueLabelDisplay="auto"
-                      step={0.1}
-                      min={-1}
-                      max={1}
-                      value={
-                        typeof blurWeight === "number"
-                          ? blurWeight
-                          : initBlurWeight
-                      }
-                      onChange={(event: Event, newValue: number | number[]) => {
-                        setBlurWeight(newValue as number);
-                      }}
-                    ></Slider>
-                  </Grid>
-                </Grid>
-                <Grid container>
-                  <Grid item xs>
                     - Sigma
                   </Grid>
                   <Grid item xs>
