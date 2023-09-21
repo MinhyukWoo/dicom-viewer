@@ -236,14 +236,13 @@ export const applySobel = (
   cv.Sobel(image, edge1, -1, 1, 0, ksize);
   cv.Sobel(image, edge2, -1, 0, 1, ksize);
   cv.add(edge1, edge2, edge);
-  // const scalar = new cv.Scalar(-1, 0, 0, 0);
-  // const mat = new cv.Mat(image.rows, image.cols, cv.CV_64F, scalar);
   edge.convertTo(edge, cv.CV_64F);
-  // cv.multiply(edge, mat, edge);
-  // console.log(edge);
   image.convertTo(image, cv.CV_64F);
   cv.add(image, edge, image);
   image.convertTo(image, imageType);
+  edge.delete();
+  edge1.delete();
+  edge2.delete();
 };
 
 export {
